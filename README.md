@@ -6,13 +6,13 @@ A small, text-only music player for the Omarchy bar. It connects directly to Nav
 
 ## Install and connect
 
-Requires Omarchy Shell, Python 3, `mpv`, and a music server. Copy this folder to `~/.config/omarchy/plugins/lazymusic.player/`, then run:
+Requires Omarchy Shell, Python 3, `mpv`, and a music server. Run this in a terminal to install and enable Lazy Music:
 
 ```sh
-omarchy plugin validate ~/.config/omarchy/plugins/lazymusic.player
-omarchy-shell shell rescanPlugins
-omarchy plugin enable lazymusic.player --section right
+omarchy plugin add https://github.com/philhurtu99/omarchy-lazy-music.git --enable
 ```
+
+Confirm the install when prompted. The bar widget defaults to the right section.
 
 Click the bar widget. On first open, select **Navidrome / Subsonic**, **Jellyfin**, or **Emby**, and enter the server URL, username, and password. Use HTTPS unless the server is on a trusted local network and you explicitly enable HTTP. The **Server** button opens setup again if you need to switch servers. Emby URLs may be entered with or without a trailing `/emby`.
 
