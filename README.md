@@ -2,7 +2,9 @@
 
 A small, text-only music player for the Omarchy bar. It connects directly to Navidrome or another Subsonic-compatible server, Jellyfin, or Emby. No artwork is loaded or shown.
 
-![Lazy Music server setup showing Navidrome / Subsonic, Jellyfin, and Emby options](assets/setup.png)
+![Illustration of the Lazy Music player with fictional track and album names](preview.png)
+
+*Illustrative preview with fictional library data.*
 
 ## Install and connect
 
@@ -13,8 +15,11 @@ omarchy plugin add https://github.com/philhurtu99/omarchy-lazy-music.git --enabl
 ```
 
 Confirm the install when prompted. The bar widget defaults to the right section.
+While this repository is private, the command requires a GitHub account with access to it.
 
 Click the bar widget. On first open, select **Navidrome / Subsonic**, **Jellyfin**, or **Emby**, and enter the server URL, username, and password. Use HTTPS unless the server is on a trusted local network and you explicitly enable HTTP. The **Server** button opens setup again if you need to switch servers. Emby URLs may be entered with or without a trailing `/emby`.
+
+![Lazy Music server setup showing Navidrome / Subsonic, Jellyfin, and Emby options](assets/setup.png)
 
 The password is used to authenticate and is not stored. A private session is stored at `~/.config/omarchy/lazy-music/session.json` with `0600` permissions, outside the plugin folder. Subsonic uses a salted token; Jellyfin and Emby use access tokens. The plugin installs no packages or system services, asks for no elevated privileges, and runs no remote installer. Its service entry runs inside the existing Omarchy Shell process.
 
@@ -28,6 +33,21 @@ The password is used to authenticate and is not stored. A private session is sto
 - Use Previous, Play/Pause, Next, Stop, and the progress bar. Escape closes the panel.
 
 Shell commands: `omarchy-shell shell summon lazymusic.player '{}'` and `omarchy-shell shell hide lazymusic.player`. To reopen server setup, use the **Server** button or `qs ipc -p /usr/share/omarchy/shell call lazymusic.player setup`.
+
+## Uninstall
+
+Stop playback before removing the plugin. Use **Stop** in the panel, or run:
+
+```sh
+python3 ~/.config/omarchy/plugins/lazymusic.player/backend.py stop
+omarchy plugin remove lazymusic.player
+```
+
+Removing the plugin does not delete its private session. To remove the saved server URL and authentication token as well, run:
+
+```sh
+rm -f ~/.config/omarchy/lazy-music/session.json
+```
 
 ## Data and security
 
