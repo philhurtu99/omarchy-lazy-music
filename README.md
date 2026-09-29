@@ -1,6 +1,8 @@
 # Lazy Music
 
-A minimal, text only music player for the Omarchy bar. It connects directly to Navidrome or another Subsonic compatible server, Jellyfin, or Emby. No artwork is loaded or shown.
+A small, text-only music player for the Omarchy bar. It connects directly to Navidrome or another Subsonic-compatible server, Jellyfin, or Emby. No artwork is loaded or shown.
+
+![Lazy Music server setup showing Navidrome / Subsonic, Jellyfin, and Emby options](assets/setup.png)
 
 ## Install and connect
 
