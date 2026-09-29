@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "lazymusic.player",
+  "name": "Lazy Music",
+  "version": "0.1.0",
+  "author": "Lazy Music contributors",
+  "license": "MIT",
+  "description": "Minimal music player for Navidrome, OpenSubsonic, Jellyfin and Emby servers, with album, artist, playlist and library shuffle.",
+  "kinds": ["service", "bar-widget"],
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Lazy Music",
+    "description": "Browse and shuffle your music without artwork.",
+    "category": "Media",
+    "defaultSection": "right",
+    "allowMultiple": false
+  }
+}
