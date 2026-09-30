@@ -26,6 +26,7 @@ The password is used to authenticate and is not stored. A private session is sto
 ## Playback
 
 - Left click opens the panel. Right click toggles pause; middle click skips to the next track.
+- The current catalog page refreshes when you reopen the panel after a minute. If the music server is unavailable at login, the plugin retries transient connection errors automatically.
 - Browse Albums, Artists, and Playlists, or search for artists, albums, and songs. Artists load in pages of 100. Select an artist to browse albums and an album to browse songs.
 - **Shuffle library** starts a random mix from the full server library and fetches another random batch as the queue runs out.
 - **Shuffle play** in an album or artist plays all songs from that selection in random order. **Shuffle play** in a playlist includes songs on every page.

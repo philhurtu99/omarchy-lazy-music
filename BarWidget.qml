@@ -12,7 +12,12 @@ BarWidget {
   property bool opened: false
   property bool popoutSwitchClosing: false
 
-  function open() { opened = true }
+  function open() {
+    var wasOpen = opened
+    opened = true
+    if (!wasOpen && service) service.refreshCurrentView(false)
+  }
+  onServiceChanged: if (opened && service) service.refreshCurrentView(false)
   function close() {
     opened = false
     if (service) service.cancelSetup()

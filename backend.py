@@ -1030,9 +1030,10 @@ def main():
     except FileNotFoundError:
         result = {"ok": False, "error": "Server session or mpv is unavailable"}
     except HTTPError as error:
-        result = {"ok": False, "error": "Server HTTP " + str(error.code)}
+        result = {"ok": False, "error": "Server HTTP " + str(error.code),
+                  "retryable": error.code in (429, 502, 503, 504)}
     except (URLError, TimeoutError):
-        result = {"ok": False, "error": "Server is unreachable"}
+        result = {"ok": False, "error": "Server is unreachable", "retryable": True}
     except (ValueError, RuntimeError, OSError, json.JSONDecodeError) as error:
         result = {"ok": False, "error": str(error)[:180]}
     print(json.dumps(result, ensure_ascii=False))

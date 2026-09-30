@@ -43,9 +43,12 @@ Item {
   property string serverKind: "subsonic"
   property var pendingCatalog: null
   property var activeCatalog: null
+  property string searchQuery: ""
+  property double lastCatalogRefresh: 0
 
   function request(kind, argument) {
     if (!configured) return
+    catalogRetryTimer.stop()
     pendingCatalog = { kind: kind, argument: String(argument || "") }
     loading = true
     error = ""
@@ -93,6 +96,7 @@ Item {
 
   function search(query) {
     var value = String(query || "").trim()
+    searchQuery = value
     if (value === "") { home(); return }
     view = "search"
     albums = []
@@ -134,6 +138,20 @@ Item {
     playlistId = id
     songs = []
     request("playlist", id)
+  }
+
+  function refreshCurrentView(force) {
+    if (!configured || !configChecked || setupOpen || catalogProcess.running || pendingCatalog) return
+    var maxAge = view === "home" && albums.length === 0 ? 10000 : 60000
+    if (!force && !error && Date.now() - lastCatalogRefresh < maxAge) return
+    if (view === "home") request("albums", "")
+    else if (view === "artists") request(artistOffset ? "artistsPage" : "artists", String(artistOffset))
+    else if (view === "playlists") request("playlists", "")
+    else if (view === "artist" && currentArtistId) request("artist", currentArtistId)
+    else if (view === "album" && currentAlbumId) request("album", currentAlbumId)
+    else if (view === "playlist" && playlistId)
+      request("playlistPage", JSON.stringify({ id: playlistId, offset: playlistOffset }))
+    else if (view === "search" && searchQuery) request("search", searchQuery)
   }
 
   function playlistPage(offset) {
@@ -291,11 +309,17 @@ Item {
     id: catalogProcess
     stdout: StdioCollector { id: catalogOutput; waitForEnd: true }
     onExited: function(exitCode) {
+      var current = root.activeCatalog && !root.pendingCatalog
       try {
         var result = JSON.parse(catalogOutput.text)
-        if (!result.ok) {
+        if (!current) {
+          // A newer page request has replaced this response.
+        } else if (!result.ok) {
           root.error = result.error || "Server unavailable"
-        } else if (root.activeCatalog && result.kind === root.activeCatalog.kind && !root.pendingCatalog) {
+          if (result.retryable === true) catalogRetryTimer.restart()
+        } else if (result.kind === root.activeCatalog.kind) {
+          root.error = ""
+          root.lastCatalogRefresh = Date.now()
           if (result.kind === "albums" || result.kind === "search" || result.kind === "artist") root.albums = result.albums || []
           if (result.kind === "search" || result.kind === "artists" || result.kind === "artistsPage" || result.kind === "artistsRefresh") root.artists = result.artists || []
           if (result.kind === "artists" || result.kind === "artistsPage" || result.kind === "artistsRefresh") {
@@ -316,12 +340,18 @@ Item {
           }
         }
       } catch (e) {
-        root.error = "Unreadable server response"
+        if (current) root.error = "Unreadable server response"
       }
       root.loading = root.pendingCatalog !== null
       root.activeCatalog = null
       Qt.callLater(root.runCatalog)
     }
+  }
+
+  Timer {
+    id: catalogRetryTimer
+    interval: 15000
+    onTriggered: root.refreshCurrentView(true)
   }
 
   Process {
