@@ -77,6 +77,7 @@ Item {
 
       Button {
         text: "SERVER"
+        tooltipText: "Change server address or disconnect"
         foreground: panel.fg
         fontFamily: panel.fontFamily
         onClicked: {

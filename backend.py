@@ -35,7 +35,7 @@ RUNTIME_DIR = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
 SOCKET = RUNTIME_DIR / "mpv.sock"
 LOCK = RUNTIME_DIR / "lock"
 PROXY_INFO = RUNTIME_DIR / "stream-proxy.json"
-USER_AGENT = "LazyMusic/0.1.0"
+USER_AGENT = "LazyMusic/0.1.1"
 CLIENT = "OmarchyLazyMusic"
 PLAYLIST_PAGE_SIZE = 100
 ARTIST_PAGE_SIZE = 100
@@ -162,7 +162,7 @@ def api(endpoint, params=None, session=None):
 def media_authorization(session):
     prefix = "Emby" if session["kind"] == "emby" else "MediaBrowser"
     base = (prefix + ' Client="Lazy Music", Device="Omarchy", '
-            'DeviceId="' + session["deviceId"] + '", Version="0.1.0"')
+            'DeviceId="' + session["deviceId"] + '", Version="0.1.1"')
     if session["kind"] == "emby":
         base += ', UserId="' + session.get("userId", "") + '"'
         return base
@@ -274,17 +274,28 @@ def configure_session(payload):
             raise ValueError("Server authentication failed")
         session = candidate | {"accessToken": access_token, "userId": user_id}
     save_session(session)
-    return {"ok": True, "configured": True, "kind": kind}
+    return {"ok": True, "configured": True, "kind": kind,
+            "serverUrl": server, "username": username}
 
 
 def config_status():
     try:
         session = read_session()
-        return {"ok": True, "configured": True, "kind": session["kind"]}
+        return {"ok": True, "configured": True, "kind": session["kind"],
+                "serverUrl": session["serverUrl"], "username": session["username"]}
     except FileNotFoundError:
         return {"ok": True, "configured": False}
     except (ValueError, json.JSONDecodeError) as error:
         return {"ok": True, "configured": False, "error": str(error)[:160]}
+
+
+def disconnect_session():
+    private_dir(RUNTIME_DIR)
+    with open(LOCK, "a+") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        control("stop")
+        SESSION.unlink(missing_ok=True)
+    return {"ok": True, "configured": False}
 
 
 def song(item):
@@ -1002,6 +1013,8 @@ def main():
     try:
         if command == "configStatus":
             result = config_status()
+        elif command == "disconnect":
+            result = disconnect_session()
         elif command == "configure":
             setup = sys.stdin.buffer.readline(MAX_SETUP_BYTES + 1)
             if not setup or len(setup) > MAX_SETUP_BYTES:

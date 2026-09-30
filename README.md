@@ -17,11 +17,11 @@ omarchy plugin add https://github.com/philhurtu99/omarchy-lazy-music.git --enabl
 Confirm the install when prompted. The bar widget defaults to the right section.
 While this repository is private, the command requires a GitHub account with access to it.
 
-Click the bar widget. On first open, select **Navidrome / Subsonic**, **Jellyfin**, or **Emby**, and enter the server URL, username, and password. Use HTTPS unless the server is on a trusted local network and you explicitly enable HTTP. The **Server** button opens setup again if you need to switch servers. Emby URLs may be entered with or without a trailing `/emby`.
+Click the bar widget. On first open, select **Navidrome / Subsonic**, **Jellyfin**, or **Emby**, and enter the server URL, username, and password. Use HTTPS unless the server is on a trusted local network and you explicitly enable HTTP. The **Server** button opens setup again with the current address and username filled in. Enter the new address and password to switch servers; the existing connection stays active if the new login fails. The eye button shows or hides the password you are typing. Emby URLs may be entered with or without a trailing `/emby`.
 
 ![Lazy Music server setup showing Navidrome / Subsonic, Jellyfin, and Emby options](assets/setup.png)
 
-The password is used to authenticate and is not stored. A private session is stored at `~/.config/omarchy/lazy-music/session.json` with `0600` permissions, outside the plugin folder. Subsonic uses a salted token; Jellyfin and Emby use access tokens. The plugin installs no packages or system services, asks for no elevated privileges, and runs no remote installer. Its service entry runs inside the existing Omarchy Shell process.
+The password is used to authenticate and is not stored. A private session is stored at `~/.config/omarchy/lazy-music/session.json` with `0600` permissions, outside the plugin folder. Subsonic uses a salted token; Jellyfin and Emby use access tokens. **Disconnect** in the Server screen stops playback and removes this local session. It does not revoke a Jellyfin or Emby token on the server or erase cached track metadata. The plugin installs no packages or system services, asks for no elevated privileges, and runs no remote installer. Its service entry runs inside the existing Omarchy Shell process.
 
 ## Playback
 

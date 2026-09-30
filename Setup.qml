@@ -10,8 +10,10 @@ Item {
   property QtObject bar: null
   property string kind: service ? service.serverKind : "subsonic"
   property bool allowHttp: false
+  property bool passwordVisible: false
+  property bool confirmDisconnect: false
   property string localError: ""
-  readonly property bool formFocused: serverField.activeFocus || userField.activeFocus || passwordField.activeFocus
+  readonly property bool formFocused: serverField.activeFocus || userField.activeFocus || passwordField.activeFocus || passwordEye.activeFocus
   readonly property color fg: bar ? bar.foreground : Color.foreground
   readonly property color dim: Color.muted
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
@@ -19,10 +21,36 @@ Item {
   implicitWidth: Style.space(380)
   implicitHeight: form.implicitHeight
 
+  onServiceChanged: {
+    if (!service) return
+    serverField.text = service.serverUrl || ""
+    userField.text = service.username || ""
+    allowHttp = serverField.text.startsWith("http://")
+  }
+
+  Connections {
+    target: setup.service
+    function onConfiguredChanged() {
+      if (setup.service && !setup.service.configured) {
+        serverField.text = ""
+        userField.text = ""
+        passwordField.text = ""
+        setup.passwordVisible = false
+        setup.confirmDisconnect = false
+        setup.allowHttp = false
+        setup.localError = ""
+      }
+    }
+  }
+
   Connections {
     target: setup.widget
     function onOpenedChanged() {
-      if (setup.widget && !setup.widget.opened) passwordField.text = ""
+      if (setup.widget && !setup.widget.opened) {
+        passwordField.text = ""
+        setup.passwordVisible = false
+        setup.confirmDisconnect = false
+      }
     }
   }
 
@@ -35,7 +63,7 @@ Item {
       spacing: Style.space(8)
       Text {
         textFormat: Text.PlainText
-        text: "CONNECT SERVER"
+        text: setup.service && setup.service.configured ? "CHANGE SERVER" : "CONNECT SERVER"
         color: setup.fg
         font.family: setup.fontFamily
         font.pixelSize: Style.font.bodySmall
@@ -54,7 +82,9 @@ Item {
     Text {
       width: parent.width
       textFormat: Text.PlainText
-      text: "Connect to your music library. Your password is used once to create a local session."
+      text: setup.service && setup.service.configured
+        ? "Enter the new server address and credentials. Your current connection stays active until the new login succeeds."
+        : "Connect to your music library. Your password is used once to create a local session."
       color: setup.dim
       font.family: setup.fontFamily
       font.pixelSize: Style.font.bodySmall
@@ -152,10 +182,12 @@ Item {
       id: passwordField
       width: parent.width
       height: Style.space(34)
-      echoMode: TextInput.Password
+      rightPadding: Style.space(40)
+      echoMode: setup.passwordVisible ? TextInput.Normal : TextInput.Password
       color: setup.fg
       font.family: setup.fontFamily
       font.pixelSize: Style.font.bodySmall
+      selectByMouse: true
       background: Rectangle {
         radius: Style.cornerRadius
         color: "transparent"
@@ -164,6 +196,23 @@ Item {
         opacity: 0.55
       }
       Keys.onEscapePressed: if (setup.widget) setup.widget.close()
+
+      Button {
+        id: passwordEye
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        width: Style.space(34)
+        height: parent.height
+        iconText: setup.passwordVisible ? "󰈈" : "󰈉"
+        tooltipText: setup.passwordVisible ? "Hide password" : "Show password"
+        foreground: setup.fg
+        fontFamily: setup.fontFamily
+        horizontalPadding: 0
+        verticalPadding: 0
+        focusable: true
+        onClicked: setup.passwordVisible = !setup.passwordVisible
+        Keys.onEscapePressed: if (setup.widget) setup.widget.close()
+      }
     }
 
     Button {
@@ -175,11 +224,12 @@ Item {
     }
 
     Button {
-      text: setup.service && setup.service.setupBusy ? "Connecting…" : "Connect"
+      text: setup.service && setup.service.setupBusy ? "Connecting…"
+        : setup.service && setup.service.configured ? "Switch server" : "Connect"
       foreground: setup.fg
       fontFamily: setup.fontFamily
       bordered: true
-      enabled: setup.service && !setup.service.setupBusy
+      enabled: setup.service && !setup.service.setupBusy && !setup.service.disconnectBusy
       onClicked: {
         setup.localError = ""
         if (!serverField.text.trim() || !userField.text.trim() || !passwordField.text) {
@@ -190,6 +240,42 @@ Item {
                                   username: userField.text.trim(), password: passwordField.text,
                                   allowHttp: setup.allowHttp })
         passwordField.text = ""
+        setup.passwordVisible = false
+      }
+    }
+
+    Text {
+      width: parent.width
+      visible: setup.confirmDisconnect
+      textFormat: Text.PlainText
+      text: "Disconnect stops playback and removes the saved login from this computer."
+      color: setup.dim
+      font.family: setup.fontFamily
+      font.pixelSize: Style.font.bodySmall
+      wrapMode: Text.WordWrap
+    }
+
+    Row {
+      visible: setup.service && setup.service.configured
+      spacing: Style.space(6)
+      Button {
+        text: setup.service && setup.service.disconnectBusy ? "Disconnecting…"
+          : setup.confirmDisconnect ? "Confirm disconnect" : "Disconnect"
+        foreground: setup.fg
+        fontFamily: setup.fontFamily
+        enabled: setup.service && !setup.service.setupBusy && !setup.service.disconnectBusy
+        onClicked: {
+          setup.localError = ""
+          if (!setup.confirmDisconnect) setup.confirmDisconnect = true
+          else if (setup.service) setup.service.disconnect()
+        }
+      }
+      Button {
+        visible: setup.confirmDisconnect
+        text: "Keep connected"
+        foreground: setup.fg
+        fontFamily: setup.fontFamily
+        onClicked: setup.confirmDisconnect = false
       }
     }
 

@@ -39,12 +39,16 @@ Item {
   property bool configChecked: false
   property bool setupOpen: false
   property bool setupBusy: false
+  property bool disconnectBusy: false
   property string setupError: ""
   property string serverKind: "subsonic"
+  property string serverUrl: ""
+  property string username: ""
   property var pendingCatalog: null
   property var activeCatalog: null
   property string searchQuery: ""
   property double lastCatalogRefresh: 0
+  property int sessionRevision: 0
 
   function request(kind, argument) {
     if (!configured) return
@@ -169,6 +173,7 @@ Item {
     shuffleBusy = true
     error = ""
     shuffleProcess.command = ["python3", helper, "playPlaylist", JSON.stringify({ id: playlistId })]
+    shuffleProcess.revision = sessionRevision
     shuffleProcess.running = true
   }
 
@@ -177,6 +182,7 @@ Item {
     shuffleBusy = true
     error = ""
     shuffleProcess.command = ["python3", helper, "playAlbum", currentAlbumId]
+    shuffleProcess.revision = sessionRevision
     shuffleProcess.running = true
   }
 
@@ -185,6 +191,7 @@ Item {
     shuffleBusy = true
     error = ""
     shuffleProcess.command = ["python3", helper, "playArtist", currentArtistId]
+    shuffleProcess.revision = sessionRevision
     shuffleProcess.running = true
   }
 
@@ -193,6 +200,7 @@ Item {
     shuffleBusy = true
     error = ""
     shuffleProcess.command = ["python3", helper, "playRandom"]
+    shuffleProcess.revision = sessionRevision
     shuffleProcess.running = true
   }
 
@@ -206,11 +214,59 @@ Item {
   }
 
   function configure(payload) {
-    if (setupProcess.running || setupBusy) return
+    if (setupProcess.running || setupBusy || disconnectBusy) return
     setupError = ""
     setupBusy = true
     setupProcess.secret = JSON.stringify(payload)
     setupProcess.running = true
+  }
+
+  function disconnect() {
+    if (!configured || setupBusy || disconnectBusy) return
+    setupError = ""
+    disconnectBusy = true
+    disconnectProcess.running = true
+  }
+
+  function clearCatalog() {
+    catalogRetryTimer.stop()
+    pendingCatalog = null
+    activeCatalog = null
+    albums = []
+    artists = []
+    playlists = []
+    songs = []
+    view = "home"
+    albumName = ""
+    albumArtist = ""
+    artistName = ""
+    playlistName = ""
+    playlistId = ""
+    currentArtistId = ""
+    currentAlbumId = ""
+    albumReturnView = "home"
+    artistOffset = 0
+    playlistOffset = 0
+    artistTotal = 0
+    playlistTotal = 0
+    searchQuery = ""
+    lastCatalogRefresh = 0
+    loading = false
+    error = ""
+  }
+
+  function clearPlayback() {
+    sessionRevision += 1
+    shuffleBusy = false
+    song = null
+    playing = false
+    paused = false
+    position = 0
+    duration = 0
+    queueLength = 0
+    shuffled = false
+    radioMode = false
+    playbackError = ""
   }
 
   function playAt(index) {
@@ -248,6 +304,8 @@ Item {
         var result = JSON.parse(configOutput.text)
         root.configured = result.configured === true
         root.serverKind = result.kind || "subsonic"
+        root.serverUrl = result.serverUrl || ""
+        root.username = result.username || ""
         root.setupError = result.error || ""
         if (root.configured) root.home()
       } catch (e) {
@@ -273,8 +331,12 @@ Item {
         var result = JSON.parse(setupOutput.text)
         if (!result.ok) root.setupError = result.error || "Could not connect to the server"
         else {
+          root.clearCatalog()
+          root.clearPlayback()
           root.configured = true
           root.serverKind = result.kind || "subsonic"
+          root.serverUrl = result.serverUrl || ""
+          root.username = result.username || ""
           root.setupOpen = false
           root.home()
         }
@@ -286,9 +348,38 @@ Item {
   }
 
   Process {
+    id: disconnectProcess
+    command: ["python3", root.helper, "disconnect"]
+    stdout: StdioCollector { id: disconnectOutput; waitForEnd: true }
+    onExited: {
+      try {
+        var result = JSON.parse(disconnectOutput.text)
+        if (!result.ok) root.setupError = result.error || "Could not disconnect"
+        else {
+          root.clearCatalog()
+          root.clearPlayback()
+          root.configured = false
+          root.serverUrl = ""
+          root.username = ""
+          root.setupOpen = true
+          root.setupError = ""
+        }
+      } catch (e) {
+        root.setupError = "Could not disconnect"
+      }
+      root.disconnectBusy = false
+    }
+  }
+
+  Process {
     id: shuffleProcess
+    property int revision: 0
     stdout: StdioCollector { id: shuffleOutput; waitForEnd: true }
     onExited: {
+      if (!root.configured || revision !== root.sessionRevision) {
+        root.shuffleBusy = false
+        return
+      }
       try {
         var result = JSON.parse(shuffleOutput.text)
         if (!result.ok) root.error = result.error || "Shuffle failed"
@@ -356,9 +447,11 @@ Item {
 
   Process {
     id: statusProcess
+    property int revision: 0
     command: ["python3", root.helper, "status"]
     stdout: StdioCollector { id: statusOutput; waitForEnd: true }
     onExited: {
+      if (!root.configured || revision !== root.sessionRevision) return
       try {
         var result = JSON.parse(statusOutput.text)
         if (!result.ok) return
@@ -380,7 +473,10 @@ Item {
     repeat: true
     running: root.configured
     triggeredOnStart: true
-    onTriggered: if (!statusProcess.running) statusProcess.running = true
+    onTriggered: if (!statusProcess.running) {
+      statusProcess.revision = root.sessionRevision
+      statusProcess.running = true
+    }
   }
 
   Component.onCompleted: configProcess.running = true

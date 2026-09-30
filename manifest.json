@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "lazymusic.player",
   "name": "Lazy Music",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Lazy Music contributors",
   "license": "MIT",
   "description": "Minimal music player for Navidrome, OpenSubsonic, Jellyfin and Emby servers, with album, artist, playlist and library shuffle.",
