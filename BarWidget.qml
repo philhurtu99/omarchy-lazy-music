@@ -32,14 +32,12 @@ BarWidget {
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
-  BarIconButton {
+  MusicIconButton {
     id: button
     anchors.fill: parent
     bar: root.bar
+    musicService: root.service
     text: "󰎆"
-    tooltipText: root.service && root.service.song && root.service.song.title
-      ? root.service.song.title + (root.service.song.artist ? " · " + root.service.song.artist : "")
-      : "Lazy Music"
     useActiveColor: false
     foreground: root.bar ? root.bar.barForeground : Color.foreground
     onPressed: function(b) {
@@ -55,15 +53,14 @@ BarWidget {
     owner: root
     bar: root.bar
     open: root.opened
-    focusTarget: keyCatcher
+    focusTarget: contentLoader.item ? contentLoader.item.keyboardFocusTarget : panelHost
     contentWidth: kpanel.fittedContentWidth(Style.space(380))
     contentHeight: kpanel.fittedContentHeight(contentLoader.item ? contentLoader.item.implicitHeight : Style.space(300))
 
-    PanelKeyCatcher {
-      id: keyCatcher
+    Item {
+      id: panelHost
       anchors.fill: parent
-      blocked: contentLoader.item ? contentLoader.item.searchFocused : false
-      onCloseRequested: root.close()
+      Keys.onEscapePressed: root.close()
 
       Loader {
         id: contentLoader
@@ -73,6 +70,7 @@ BarWidget {
           if (!item) return
           item.widget = root
           item.bar = root.bar
+          if (root.opened) Qt.callLater(item.focusKeyboard)
         }
       }
     }
@@ -80,11 +78,30 @@ BarWidget {
 
   IpcHandler {
     target: "lazymusic.player"
+    function keyboardState(): string {
+      var item = contentLoader.item
+      return JSON.stringify({
+        playbackKey: "Space",
+        opened: root.opened,
+        mapped: kpanel.backingWindowVisible,
+        focused: kpanel.focusTarget ? kpanel.focusTarget.activeFocus : false,
+        setup: item ? item.setupMode : false,
+        loading: root.service ? root.service.loading : false,
+        entries: item ? item.entries.length : 0
+      })
+    }
     function open(): void { root.open() }
     function close(): void { root.close() }
     function show(): void { root.open() }
     function hide(): void { root.close() }
     function toggle(): void { root.toggle() }
+    function previous(): void { if (root.service) root.service.previous() }
+    function next(): void { if (root.service) root.service.next() }
+    function playPause(): void {
+      if (!root.service) return
+      if (root.opened && contentLoader.item) contentLoader.item.playSelection()
+      else root.service.togglePlayback()
+    }
     function setup(): void {
       if (root.service) root.service.beginSetup()
       root.open()

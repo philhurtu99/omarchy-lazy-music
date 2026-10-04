@@ -13,13 +13,15 @@ Item {
   property bool passwordVisible: false
   property bool confirmDisconnect: false
   property string localError: ""
-  readonly property bool formFocused: serverField.activeFocus || userField.activeFocus || passwordField.activeFocus || passwordEye.activeFocus
+  readonly property Item keyboardFocusTarget: serverField
   readonly property color fg: bar ? bar.foreground : Color.foreground
   readonly property color dim: Color.muted
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
 
   implicitWidth: Style.space(380)
   implicitHeight: form.implicitHeight
+
+  Keys.onEscapePressed: if (setup.widget) setup.widget.close()
 
   onServiceChanged: {
     if (!service) return
@@ -71,6 +73,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
       }
       Button {
+        focusable: true
         visible: setup.service && setup.service.configured
         text: "CANCEL"
         foreground: setup.fg
@@ -94,6 +97,7 @@ Item {
     Row {
       spacing: Style.space(6)
       Button {
+        focusable: true
         text: "NAVIDROME / SUBSONIC"
         selected: setup.kind === "subsonic"
         foreground: setup.fg
@@ -101,6 +105,7 @@ Item {
         onClicked: setup.kind = "subsonic"
       }
       Button {
+        focusable: true
         text: "JELLYFIN"
         selected: setup.kind === "jellyfin"
         foreground: setup.fg
@@ -108,6 +113,7 @@ Item {
         onClicked: setup.kind = "jellyfin"
       }
       Button {
+        focusable: true
         text: "EMBY"
         selected: setup.kind === "emby"
         foreground: setup.fg
@@ -216,6 +222,7 @@ Item {
     }
 
     Button {
+      focusable: true
       text: "Allow HTTP for a trusted local server"
       selected: setup.allowHttp
       foreground: setup.fg
@@ -224,6 +231,7 @@ Item {
     }
 
     Button {
+      focusable: true
       text: setup.service && setup.service.setupBusy ? "Connecting…"
         : setup.service && setup.service.configured ? "Switch server" : "Connect"
       foreground: setup.fg
@@ -259,6 +267,7 @@ Item {
       visible: setup.service && setup.service.configured
       spacing: Style.space(6)
       Button {
+        focusable: true
         text: setup.service && setup.service.disconnectBusy ? "Disconnecting…"
           : setup.confirmDisconnect ? "Confirm disconnect" : "Disconnect"
         foreground: setup.fg
@@ -271,6 +280,7 @@ Item {
         }
       }
       Button {
+        focusable: true
         visible: setup.confirmDisconnect
         text: "Keep connected"
         foreground: setup.fg
