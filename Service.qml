@@ -35,6 +35,7 @@ Item {
   property bool shuffled: false
   property bool radioMode: false
   property string playbackError: ""
+  property string favoriteBusyId: ""
   property bool configured: false
   property bool configChecked: false
   property bool setupOpen: false
@@ -295,6 +296,28 @@ Item {
   function stop() { control("stop") }
   function seek(seconds) { control("seek", seconds) }
 
+  function setFavorite(track) {
+    if (!track || !track.id || favoriteProcess.running || !configured) return
+    favoriteBusyId = String(track.id)
+    favoriteProcess.revision = sessionRevision
+    favoriteProcess.command = ["python3", helper, "setFavorite", JSON.stringify({
+      id: String(track.id), favorite: track.favorite !== true
+    })]
+    favoriteProcess.running = true
+  }
+
+  function applyFavorite(trackId, favorite) {
+    var nextSongs = songs.slice()
+    for (var i = 0; i < nextSongs.length; ++i) {
+      if (String(nextSongs[i].id) === trackId) {
+        nextSongs[i] = Object.assign({}, nextSongs[i], { favorite: favorite })
+      }
+    }
+    songs = nextSongs
+    if (song && String(song.id) === trackId)
+      song = Object.assign({}, song, { favorite: favorite })
+  }
+
   Process {
     id: configProcess
     command: ["python3", root.helper, "configStatus"]
@@ -368,6 +391,24 @@ Item {
         root.setupError = "Could not disconnect"
       }
       root.disconnectBusy = false
+    }
+  }
+
+  Process {
+    id: favoriteProcess
+    property int revision: 0
+    stdout: StdioCollector { id: favoriteOutput; waitForEnd: true }
+    onExited: {
+      if (revision === root.sessionRevision) {
+        try {
+          var result = JSON.parse(favoriteOutput.text)
+          if (result.ok) root.applyFavorite(String(result.id), result.favorite === true)
+          else root.error = result.error || "Could not update favorite"
+        } catch (e) {
+          root.error = "Could not update favorite"
+        }
+      }
+      root.favoriteBusyId = ""
     }
   }
 

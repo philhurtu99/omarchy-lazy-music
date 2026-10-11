@@ -33,6 +33,7 @@ The password is used to authenticate and is not stored. A private session is sto
 - **Shuffle play** in an album or artist plays all songs from that selection in random order. **Shuffle play** in a playlist includes songs on every page.
 - Large playlists are fetched once into a private local cache; the panel displays 100 tracks per page. **Refresh playlist** reloads it. **Refresh artists** reloads the artist list, including the local Subsonic cache.
 - Use Previous, Play/Pause, Next, Stop, and the progress bar. Escape closes the panel.
+- Like or unlike the currently playing song with the heart at the bottom right of its title and artist. Favorites are saved on the music server.
 
 ## Keyboard
 

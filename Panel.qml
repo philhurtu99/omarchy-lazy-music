@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Shapes
 import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Ui
@@ -201,29 +202,68 @@ Item {
       }
     }
 
-    Column {
+    Item {
       width: parent.width
-      spacing: Style.space(3)
+      height: songMetadata.implicitHeight
 
-      Text {
-        width: parent.width
-        textFormat: Text.PlainText
-        text: panel.hasSong ? (panel.currentSong.title || "Untitled track") : "Nothing playing"
-        color: panel.fg
-        font.family: panel.fontFamily
-        font.pixelSize: Style.font.subtitle
-        font.bold: true
-        elide: Text.ElideRight
+      Column {
+        id: songMetadata
+        width: parent.width - (panel.hasSong ? currentFavorite.width + Style.space(6) : 0)
+        spacing: Style.space(3)
+
+        Text {
+          width: parent.width
+          textFormat: Text.PlainText
+          text: panel.hasSong ? (panel.currentSong.title || "Untitled track") : "Nothing playing"
+          color: panel.fg
+          font.family: panel.fontFamily
+          font.pixelSize: Style.font.subtitle
+          font.bold: true
+          elide: Text.ElideRight
+        }
+
+        Text {
+          width: parent.width
+          textFormat: Text.PlainText
+          text: panel.hasSong ? [panel.currentSong.artist, panel.currentSong.album].filter(Boolean).join(" · ") : "Music library"
+          color: panel.dim
+          font.family: panel.fontFamily
+          font.pixelSize: Style.font.bodySmall
+          elide: Text.ElideRight
+        }
       }
 
-      Text {
-        width: parent.width
-        textFormat: Text.PlainText
-        text: panel.hasSong ? [panel.currentSong.artist, panel.currentSong.album].filter(Boolean).join(" · ") : "Music library"
-        color: panel.dim
-        font.family: panel.fontFamily
-        font.pixelSize: Style.font.bodySmall
-        elide: Text.ElideRight
+      Button {
+        id: currentFavorite
+        readonly property bool liked: !!panel.currentSong && panel.currentSong.favorite === true
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        focusable: true
+        implicitWidth: iconSize + horizontalPadding * 2 + _reservedBorderLeft + _reservedBorderRight
+        implicitHeight: iconSize + verticalPadding * 2 + _reservedBorderTop + _reservedBorderBottom
+        tooltipText: liked ? "Unlike song" : "Like song"
+        foreground: liked ? Color.accent : panel.fg
+        fontFamily: panel.fontFamily
+        iconSize: Style.font.subtitle
+        enabled: panel.hasSong && panel.service && !panel.service.favoriteBusyId
+        visible: panel.hasSong
+        onClicked: if (panel.service) panel.service.setFavorite(panel.currentSong)
+
+        Shape {
+          anchors.centerIn: parent
+          width: 24
+          height: 24
+          scale: currentFavorite.iconSize / 24
+          ShapePath {
+            strokeColor: currentFavorite.foreground
+            strokeWidth: 1.7
+            fillColor: currentFavorite.liked ? Color.accent : "transparent"
+            joinStyle: ShapePath.RoundJoin
+            PathSvg {
+              path: "M 12 21 C 10 19 3 14 2 9 C 1 3 8 1 12 6 C 16 1 23 3 22 9 C 21 14 14 19 12 21 Z"
+            }
+          }
+        }
       }
     }
 

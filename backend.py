@@ -197,7 +197,7 @@ def media_api(path, params=None, session=None, body=None):
 def media_items(path, params=None, convert=None, page_size=500):
     params = dict(params or {})
     params.update({"StartIndex": 0, "Limit": page_size, "EnableImages": "false",
-                   "EnableUserData": "false", "EnableTotalRecordCount": "true"})
+                   "EnableUserData": "true", "EnableTotalRecordCount": "true"})
     transform = convert or (lambda item: item)
     def fetch(start, limit=page_size):
         response = media_api(path, params | {"StartIndex": start, "Limit": limit})
@@ -300,7 +300,8 @@ def disconnect_session():
 
 def song(item):
     return {key: str(item.get(key) or "")[:500] for key in ("id", "title", "artist", "album")} | {
-        "duration": max(0, int(item.get("duration") or 0))
+        "duration": max(0, int(item.get("duration") or 0)),
+        "favorite": item.get("favorite") is True or bool(item.get("starred"))
     }
 
 
@@ -324,11 +325,13 @@ def playlist(item):
 
 def media_song(item):
     artists = item.get("Artists") or []
+    user_data = item.get("UserData") if isinstance(item.get("UserData"), dict) else {}
     name = (", ".join(str(artist) for artist in artists)
             if isinstance(artists, list) and artists else item.get("AlbumArtist") or "")
     return {"id": str(item.get("Id") or "")[:500], "title": str(item.get("Name") or "")[:500],
             "artist": str(name)[:500], "album": str(item.get("Album") or "")[:500],
-            "duration": max(0, int(item.get("RunTimeTicks") or 0) // 10_000_000)} if item.get("Id") else None
+            "duration": max(0, int(item.get("RunTimeTicks") or 0) // 10_000_000),
+            "favorite": bool(user_data.get("IsFavorite"))} if item.get("Id") else None
 
 
 def media_album(item):
@@ -388,7 +391,8 @@ def media_artist_songs(artist_id):
 
 def media_random_tracks():
     data = media_api(media_user_path(), {"IncludeItemTypes": "Audio", "Recursive": "true",
-                                                    "SortBy": "Random", "Limit": 100, "EnableImages": "false"})
+                                                    "SortBy": "Random", "Limit": 100, "EnableImages": "false",
+                                                    "EnableUserData": "true"})
     return [value for item in data.get("Items", []) if (value := media_song(item)) is not None]
 
 
@@ -406,7 +410,8 @@ def media_catalog(command, argument=""):
         query = argument[:150]
         queries = [("Artists/AlbumArtists", {"UserId": read_session()["userId"], "SearchTerm": query, "Limit": 12}),
                    (path, {"SearchTerm": query, "IncludeItemTypes": "MusicAlbum", "Recursive": "true", "Limit": 12}),
-                   (path, {"SearchTerm": query, "IncludeItemTypes": "Audio", "Recursive": "true", "Limit": 30})]
+                   (path, {"SearchTerm": query, "IncludeItemTypes": "Audio", "Recursive": "true", "Limit": 30,
+                           "EnableUserData": "true"})]
         with ThreadPoolExecutor(max_workers=3) as pool:
             results = list(pool.map(lambda entry: media_api(entry[0], entry[1]), queries))
         return {"ok": True, "kind": "search",
@@ -483,6 +488,79 @@ def playlist_page(playlist_id, offset, refresh=False):
     start = max(0, min(int(offset), max(0, len(tracks) - 1)))
     return {"ok": True, "kind": "playlist", "name": data["name"], "id": playlist_id,
             "songs": tracks[start:start + PLAYLIST_PAGE_SIZE], "totalSongs": len(tracks), "offset": start}
+
+
+def set_favorite(argument):
+    request = json.loads(argument)
+    if not isinstance(request, dict):
+        raise ValueError("Invalid favorite request")
+    track_id = str(request.get("id") or "")
+    favorite = request.get("favorite")
+    if not track_id or len(track_id) > 500 or any(ord(char) < 32 for char in track_id):
+        raise ValueError("Invalid song")
+    if not isinstance(favorite, bool):
+        raise ValueError("Invalid favorite state")
+    session = read_session()
+    if session["kind"] == "subsonic":
+        api("star" if favorite else "unstar", {"id": track_id}, session)
+    else:
+        headers = {"User-Agent": USER_AGENT, "Accept": "application/json",
+                   "Authorization": media_authorization(session)}
+        if session["kind"] == "emby":
+            headers["X-Emby-Token"] = session["accessToken"]
+        method = "POST" if favorite else "DELETE"
+        path = ("Users/" + quote(session["userId"], safe="") + "/FavoriteItems/" + quote(track_id, safe=""))
+        req = Request(media_url(path, session=session), data=b"" if favorite else None,
+                      headers=headers, method=method)
+        with HTTP.open(req, timeout=30) as response:
+            response.read(1024)
+    update_cached_favorite(track_id, favorite)
+    update_playback_favorite(track_id, favorite)
+    return {"ok": True, "id": track_id, "favorite": favorite}
+
+
+def update_cached_favorite(track_id, favorite):
+    try:
+        paths = CACHE_DIR.glob("*.json")
+        for path in paths:
+            try:
+                data = json.loads(path.read_text())
+            except (OSError, json.JSONDecodeError):
+                continue
+            tracks = data.get("songs") if isinstance(data, dict) else None
+            if not isinstance(tracks, list):
+                continue
+            changed = False
+            for track in tracks:
+                if isinstance(track, dict) and str(track.get("id") or "") == track_id:
+                    track["favorite"] = favorite
+                    changed = True
+            if changed:
+                temporary = path.with_name(path.name + f".{os.getpid()}.tmp")
+                fd = os.open(temporary, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
+                with os.fdopen(fd, "w") as output:
+                    json.dump(data, output)
+                os.replace(temporary, path)
+    except OSError:
+        pass
+
+
+def update_playback_favorite(track_id, favorite):
+    private_dir(RUNTIME_DIR)
+    with open(LOCK, "a+") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        queue = read_queue()
+        changed = False
+        for track in queue:
+            if isinstance(track, dict) and str(track.get("id") or "") == track_id:
+                track["favorite"] = favorite
+                changed = True
+        if changed:
+            save_queue(queue)
+        state = read_state()
+        if isinstance(state.get("song"), dict) and str(state["song"].get("id") or "") == track_id:
+            state["song"]["favorite"] = favorite
+            save_state(state)
 
 
 def artist_cache_path():
@@ -1024,6 +1102,8 @@ def main():
             with open(LOCK, "a+") as lock:
                 fcntl.flock(lock, fcntl.LOCK_EX)
                 control("stop")
+        elif command == "setFavorite":
+            result = set_favorite(argument)
         elif command in ("albums", "search", "artists", "artistsPage", "artistsRefresh", "artist",
                        "album", "playlists", "playlist", "playlistPage", "playlistRefresh", "ping"):
             result = catalog(command, argument)
