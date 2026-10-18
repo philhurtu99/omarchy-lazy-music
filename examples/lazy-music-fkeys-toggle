@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Turn Lazy Music's global F5/F6/F7 and media-key bindings on or off.
+# Usage: lazy-music-fkeys-toggle [on|off|toggle]
+
+FLAG_FILE="$HOME/.local/state/omarchy-lazy-music/fkeys-disabled"
+
+case "${1:-toggle}" in
+  on) rm -f "$FLAG_FILE" ;;
+  off) mkdir -p "$(dirname "$FLAG_FILE")" && touch "$FLAG_FILE" ;;
+  toggle)
+    if [[ -f $FLAG_FILE ]]; then
+      rm -f "$FLAG_FILE"
+    else
+      mkdir -p "$(dirname "$FLAG_FILE")" && touch "$FLAG_FILE"
+    fi
+    ;;
+  *)
+    echo "Usage: lazy-music-fkeys-toggle [on|off|toggle]" >&2
+    exit 1
+    ;;
+esac
+
+hyprctl reload >/dev/null
+

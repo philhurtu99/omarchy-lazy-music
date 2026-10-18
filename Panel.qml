@@ -1,5 +1,7 @@
 import QtQuick
 import QtQuick.Shapes
+import Quickshell
+import Quickshell.Io
 import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Ui
@@ -14,6 +16,8 @@ Item {
   readonly property Item keyboardFocusTarget: setupMode && setupLoader.item
     ? setupLoader.item.keyboardFocusTarget : waitMode ? panel : catalog
   readonly property var entries: catalogEntries()
+  // F5/F6/F7 and media keys are ignored while this flag file exists.
+  property bool mediaKeysEnabled: true
   readonly property color fg: bar ? bar.foreground : Color.foreground
   readonly property color dim: Color.muted
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
@@ -43,6 +47,7 @@ Item {
   }
 
   function focusKeyboard() {
+    mediaKeysFlag.reload()
     if (widget && widget.opened && keyboardFocusTarget) keyboardFocusTarget.forceActiveFocus()
   }
 
@@ -89,13 +94,24 @@ Item {
     catalog.forceActiveFocus()
   }
 
+  FileView {
+    id: mediaKeysFlag
+    path: Quickshell.env("HOME") + "/.local/state/omarchy-lazy-music/fkeys-disabled"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: panel.mediaKeysEnabled = false
+    onLoadFailed: panel.mediaKeysEnabled = true
+  }
+
   onSetupModeChanged: Qt.callLater(focusKeyboard)
   onWaitModeChanged: Qt.callLater(focusKeyboard)
 
   // Unhandled keys bubble here from buttons and the list. Text fields keep
   // their editing keys, and buttons handle their own Enter/Space activation.
   Keys.onPressed: function(event) {
-    var mediaModifiers = event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier | Qt.ShiftModifier)
+    var mediaModifiers = !panel.mediaKeysEnabled
+      || event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier | Qt.ShiftModifier)
     if (!mediaModifiers && (event.key === Qt.Key_F5 || event.key === Qt.Key_MediaPrevious)) {
       if (!event.isAutoRepeat && panel.service) panel.service.previous()
     } else if (!mediaModifiers && (event.key === Qt.Key_F6 || event.key === Qt.Key_MediaPlay
@@ -316,41 +332,62 @@ Item {
       }
     }
 
-    Row {
-      spacing: Style.space(6)
-      Button {
-        focusable: true
-        iconText: "󰒮"
-        tooltipText: "Previous"
-        foreground: panel.fg
-        fontFamily: panel.fontFamily
-        onClicked: if (panel.service) panel.service.previous()
+    Item {
+      width: parent.width
+      height: transport.implicitHeight
+
+      Row {
+        id: transport
+        spacing: Style.space(6)
+        Button {
+          focusable: true
+          iconText: "󰒮"
+          tooltipText: "Previous"
+          foreground: panel.fg
+          fontFamily: panel.fontFamily
+          onClicked: if (panel.service) panel.service.previous()
+        }
+        Button {
+          focusable: true
+          iconText: !panel.newSongSelected && panel.service && panel.service.playing ? "󰏤" : "󰐊"
+          tooltipText: panel.newSongSelected ? "Play selected track"
+            : panel.service && panel.service.playing ? "Pause" : "Play"
+          foreground: panel.fg
+          fontFamily: panel.fontFamily
+          bordered: true
+          onClicked: panel.playSelection()
+        }
+        Button {
+          focusable: true
+          iconText: "󰒭"
+          tooltipText: "Next"
+          foreground: panel.fg
+          fontFamily: panel.fontFamily
+          onClicked: if (panel.service) panel.service.next()
+        }
+        Button {
+          focusable: true
+          iconText: "󰓛"
+          tooltipText: "Stop"
+          foreground: panel.fg
+          fontFamily: panel.fontFamily
+          onClicked: if (panel.service) panel.service.stop()
+        }
       }
+
       Button {
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
         focusable: true
-        iconText: !panel.newSongSelected && panel.service && panel.service.playing ? "󰏤" : "󰐊"
-        tooltipText: panel.newSongSelected ? "Play selected track"
-          : panel.service && panel.service.playing ? "Pause" : "Play"
+        text: panel.mediaKeysEnabled ? "KEYS ON" : "KEYS OFF"
+        tooltipText: "Turn the F5/F6/F7 and media key shortcuts on or off"
+        selected: panel.mediaKeysEnabled
         foreground: panel.fg
         fontFamily: panel.fontFamily
-        bordered: true
-        onClicked: panel.playSelection()
-      }
-      Button {
-        focusable: true
-        iconText: "󰒭"
-        tooltipText: "Next"
-        foreground: panel.fg
-        fontFamily: panel.fontFamily
-        onClicked: if (panel.service) panel.service.next()
-      }
-      Button {
-        focusable: true
-        iconText: "󰓛"
-        tooltipText: "Stop"
-        foreground: panel.fg
-        fontFamily: panel.fontFamily
-        onClicked: if (panel.service) panel.service.stop()
+        onClicked: {
+          panel.mediaKeysEnabled = !panel.mediaKeysEnabled
+          Quickshell.execDetached(["lazy-music-fkeys-toggle", panel.mediaKeysEnabled ? "on" : "off"])
+        }
       }
     }
 

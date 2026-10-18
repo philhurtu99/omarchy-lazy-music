@@ -64,6 +64,12 @@ o.bind("F7", "Lazy Music: next", "omarchy-shell lazymusic.player next")
 
 Keyboards with media symbols may send `XF86AudioPrev`, `XF86AudioPlay`, `XF86AudioPause`, and `XF86AudioNext` instead (often using Fn). These keys are already assigned to Omarchy's general media player. [The complete binding example](examples/hypr-media-keys.lua) replaces them and adds F5/F6/F7. Reload with `hyprctl reload` and check `hyprctl configerrors`. These F keys then control Lazy Music in every app. When the panel is closed, play/pause resumes or pauses the current queue. With the panel open, it uses the selected song.
 
+**KEYS ON / KEYS OFF**, at the right of the playback controls, turns these shortcuts off when they get in the way, for example in games. When off, the panel ignores F5/F6/F7 and media keys, and the binding example leaves those keys unbound so they reach the focused app. Volume and mute keys are not affected. The choice is kept across restarts. For the button to update Hyprland, install the helper on your `PATH`:
+
+```sh
+install -m 755 examples/lazy-music-fkeys-toggle ~/.local/bin/
+```
+
 Shell commands: `omarchy-shell shell summon lazymusic.player '{}'` and `omarchy-shell shell hide lazymusic.player`. To reopen server setup, use the **Server** button or `qs ipc -p /usr/share/omarchy/shell call lazymusic.player setup`.
 
 ## Uninstall

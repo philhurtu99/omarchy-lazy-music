@@ -10,9 +10,17 @@ local lazy_music_keys = {
   { "XF86AudioNext", "next", "next" },
 }
 
+-- The KEYS ON/OFF button in the panel runs lazy-music-fkeys-toggle. When off,
+-- these keys are left unbound so they reach the focused app (e.g. games).
+local keys_flag = io.open(os.getenv("HOME") .. "/.local/state/omarchy-lazy-music/fkeys-disabled", "r")
+local keys_disabled = keys_flag ~= nil
+if keys_flag then keys_flag:close() end
+
 for _, binding in ipairs(lazy_music_keys) do
   hl.unbind(binding[1])
-  o.bind(binding[1], "Lazy Music: " .. binding[2],
-    "omarchy-shell lazymusic.player " .. binding[3],
-    { locked = binding[1]:sub(1, 4) == "XF86" })
+  if not keys_disabled then
+    o.bind(binding[1], "Lazy Music: " .. binding[2],
+      "omarchy-shell lazymusic.player " .. binding[3],
+      { locked = binding[1]:sub(1, 4) == "XF86" })
+  end
 end
